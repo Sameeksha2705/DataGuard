@@ -1,0 +1,45 @@
+column_name,data_type,missing_count,missing_percentage,non_null_count,missing_severity
+taxi_company_borough,object,99922,99.922,78,Very High
+facility_type,object,99775,99.775,225,Very High
+bridge_highway_direction,object,99744,99.744,256,Very High
+road_ramp,object,99743,99.74300000000001,257,Very High
+due_date,object,99574,99.574,426,Very High
+bridge_highway_segment,object,99544,99.544,456,Very High
+bridge_highway_name,object,99538,99.53800000000001,462,Very High
+taxi_pick_up_location,object,98753,98.753,1247,Very High
+vehicle_type,object,94573,94.573,5427,Very High
+descriptor_2,object,66778,66.778,33222,High
+landmark,object,33400,33.4,66600,High
+intersection_street_2,object,25207,25.207,74793,High
+intersection_street_1,object,25202,25.202,74798,High
+closed_date,object,25095,25.095,74905,High
+cross_street_2,object,21268,21.268,78732,Medium
+cross_street_1,object,21239,21.239,78761,Medium
+location_type,object,13161,13.161000000000001,86839,Medium
+bbl,float64,13066,13.065999999999999,86934,Medium
+resolution_description,object,11140,11.14,88860,Medium
+resolution_action_updated_date,object,10269,10.269,89731,Medium
+city,object,5999,5.9990000000000006,94001,Medium
+incident_address,object,3719,3.7190000000000003,96281,Low
+street_name,object,3719,3.7190000000000003,96281,Low
+council_district,float64,2492,2.492,97508,Low
+descriptor,object,2397,2.3970000000000002,97603,Low
+location,object,2035,2.035,97965,Low
+longitude,float64,2035,2.035,97965,Low
+latitude,float64,2035,2.035,97965,Low
+x_coordinate_state_plane,float64,2030,2.03,97970,Low
+y_coordinate_state_plane,float64,2020,2.02,97980,Low
+incident_zip,float64,811,0.8109999999999999,99189,Low
+address_type,object,537,0.5369999999999999,99463,Low
+park_facility_name,object,138,0.13799999999999998,99862,Low
+unique_key,int64,0,0.0,100000,No Missing Values
+created_date,object,0,0.0,100000,No Missing Values
+agency,object,0,0.0,100000,No Missing Values
+complaint_type,object,0,0.0,100000,No Missing Values
+agency_name,object,0,0.0,100000,No Missing Values
+status,object,0,0.0,100000,No Missing Values
+community_board,object,0,0.0,100000,No Missing Values
+police_precinct,object,0,0.0,100000,No Missing Values
+park_borough,object,0,0.0,100000,No Missing Values
+borough,object,0,0.0,100000,No Missing Values
+open_data_channel_type,object,0,0.0,100000,No Missing Values

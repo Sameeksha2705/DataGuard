@@ -1,0 +1,19 @@
+# Python cache files
+__pycache__/
+*.pyc
+
+# Jupyter notebook checkpoints
+.ipynb_checkpoints/
+
+# Environment/secrets
+.env
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Large local data files
+data/*.csv
+
+# VS Code local settings
+.vscode/

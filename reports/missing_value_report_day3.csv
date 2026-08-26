@@ -1,0 +1,45 @@
+column_name,data_type,non_null_count,missing_count,missing_percentage,missing_severity,business_importance,recommended_action
+taxi_company_borough,object,78,99922,99.922,Very High,Conditional,Likely expected missingness; validate against related complaint types
+facility_type,object,225,99775,99.775,Very High,Conditional,Likely expected missingness; validate against related complaint types
+bridge_highway_direction,object,256,99744,99.744,Very High,Conditional,Likely expected missingness; validate against related complaint types
+road_ramp,object,257,99743,99.74300000000001,Very High,Conditional,Likely expected missingness; validate against related complaint types
+due_date,object,426,99574,99.574,Very High,Optional / Review,"Optional field; review before deciding to drop, fill, or ignore"
+bridge_highway_segment,object,456,99544,99.544,Very High,Conditional,Likely expected missingness; validate against related complaint types
+bridge_highway_name,object,462,99538,99.53800000000001,Very High,Conditional,Likely expected missingness; validate against related complaint types
+taxi_pick_up_location,object,1247,98753,98.753,Very High,Conditional,Likely expected missingness; validate against related complaint types
+vehicle_type,object,5427,94573,94.573,Very High,Conditional,Likely expected missingness; validate against related complaint types
+descriptor_2,object,33222,66778,66.778,High,Optional / Review,"Optional field; review before deciding to drop, fill, or ignore"
+landmark,object,66600,33400,33.4,High,Optional / Review,"Optional field; review before deciding to drop, fill, or ignore"
+intersection_street_2,object,74793,25207,25.207,High,Optional / Review,"Optional field; review before deciding to drop, fill, or ignore"
+intersection_street_1,object,74798,25202,25.202,High,Optional / Review,"Optional field; review before deciding to drop, fill, or ignore"
+closed_date,object,74905,25095,25.095,High,Important,Review with status; missing may be expected for open requests
+cross_street_2,object,78732,21268,21.268,Medium,Optional / Review,"Optional field; review before deciding to drop, fill, or ignore"
+cross_street_1,object,78761,21239,21.239,Medium,Optional / Review,"Optional field; review before deciding to drop, fill, or ignore"
+location_type,object,86839,13161,13.161000000000001,Medium,Optional / Review,"Optional field; review before deciding to drop, fill, or ignore"
+bbl,float64,86934,13066,13.065999999999999,Medium,Optional / Review,"Optional field; review before deciding to drop, fill, or ignore"
+resolution_description,object,88860,11140,11.14,Medium,Important,Review and consider flagging or filling with UNKNOWN if appropriate
+resolution_action_updated_date,object,89731,10269,10.269,Medium,Important,Review and consider flagging or filling with UNKNOWN if appropriate
+city,object,94001,5999,5.9990000000000006,Medium,Important,Review and consider flagging or filling with UNKNOWN if appropriate
+incident_address,object,96281,3719,3.7190000000000003,Low,Optional / Review,"Optional field; review before deciding to drop, fill, or ignore"
+street_name,object,96281,3719,3.7190000000000003,Low,Optional / Review,"Optional field; review before deciding to drop, fill, or ignore"
+council_district,float64,97508,2492,2.492,Low,Optional / Review,"Optional field; review before deciding to drop, fill, or ignore"
+descriptor,object,97603,2397,2.3970000000000002,Low,Optional / Review,"Optional field; review before deciding to drop, fill, or ignore"
+location,object,97965,2035,2.035,Low,Important,Review and consider flagging or filling with UNKNOWN if appropriate
+longitude,float64,97965,2035,2.035,Low,Important,Review and consider flagging or filling with UNKNOWN if appropriate
+latitude,float64,97965,2035,2.035,Low,Important,Review and consider flagging or filling with UNKNOWN if appropriate
+x_coordinate_state_plane,float64,97970,2030,2.03,Low,Optional / Review,"Optional field; review before deciding to drop, fill, or ignore"
+y_coordinate_state_plane,float64,97980,2020,2.02,Low,Optional / Review,"Optional field; review before deciding to drop, fill, or ignore"
+incident_zip,float64,99189,811,0.8109999999999999,Low,Important,Review and consider flagging or filling with UNKNOWN if appropriate
+address_type,object,99463,537,0.5369999999999999,Low,Optional / Review,"Optional field; review before deciding to drop, fill, or ignore"
+park_facility_name,object,99862,138,0.13799999999999998,Low,Optional / Review,"Optional field; review before deciding to drop, fill, or ignore"
+unique_key,int64,100000,0,0.0,No Missing Values,Critical,No action needed
+created_date,object,100000,0,0.0,No Missing Values,Critical,No action needed
+agency,object,100000,0,0.0,No Missing Values,Critical,No action needed
+complaint_type,object,100000,0,0.0,No Missing Values,Critical,No action needed
+agency_name,object,100000,0,0.0,No Missing Values,Critical,No action needed
+status,object,100000,0,0.0,No Missing Values,Critical,No action needed
+community_board,object,100000,0,0.0,No Missing Values,Optional / Review,No action needed
+police_precinct,object,100000,0,0.0,No Missing Values,Optional / Review,No action needed
+park_borough,object,100000,0,0.0,No Missing Values,Optional / Review,No action needed
+borough,object,100000,0,0.0,No Missing Values,Important,No action needed
+open_data_channel_type,object,100000,0,0.0,No Missing Values,Optional / Review,No action needed

@@ -1,0 +1,7 @@
+fix_name,columns_affected,issue_fixed,fix_applied,safe_auto_fix,notes
+Standardize text columns,"borough, city, status, agency, complaint_type, descriptor",Inconsistent capitalization or extra spaces in text fields,str.strip() and str.upper(),Yes,Text values were standardized while preserving missing values.
+Parse date columns,"created_date, closed_date, due_date, resolution_action_updated_date",Date columns loaded as object/text,pd.to_datetime(errors='coerce'),Yes,Date columns were converted to datetime format for reliable time-based analysis.
+Clean ZIP code format,incident_zip,ZIP codes loaded as float values,Converted ZIP codes from float format to clean string format,Yes,Created incident_zip_clean while preserving the original incident_zip column.
+Remove full-row duplicates,All columns,Fully duplicated records,drop_duplicates(),Yes,Removed 0 full-row duplicate records.
+Remove duplicate unique_key values,unique_key,Duplicate service request identifiers,"drop_duplicates(subset=['unique_key'], keep='first')",Yes,Removed 0 duplicate unique_key records.
+Create resolution_time column,"created_date, closed_date",Resolution duration not directly available,closed_date - created_date,Yes,Created resolution_time for time-based analysis. Missing closed_date values result in missing resolution_time.
