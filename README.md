@@ -43,12 +43,14 @@ DataGuard/
 │   └── auto_fix_report.csv
 ├── scripts/
 │   ├── quality_checker.py
-│   └── test_db_connection.py
+│   ├── test_db_connection.py
+│   └── load_raw_to_postgres.py
 ├── sql/
-│   └── schema_design.md
+│   ├── schema_design.md
+│   ├── create_tables.sql
+│   └── verify_raw_load.sql
 ├── .gitignore
 └── README.md
-```
 
 ## Tools Used So Far
 
@@ -230,3 +232,29 @@ New files created:
 
 - `scripts/test_db_connection.py`
 - `sql/schema_design.md`
+
+### Day 9: PostgreSQL Tables and Raw Data Load
+
+Completed:
+
+- Created `sql/create_tables.sql`
+- Created PostgreSQL tables for the DataGuard database:
+  - `raw_311_requests`
+  - `clean_311_requests`
+  - `quality_log`
+  - `data_quality_alerts`
+- Created `scripts/load_raw_to_postgres.py`
+- Loaded 100,000 raw NYC 311 records into the `raw_311_requests` table
+- Verified the raw table row count using SQL
+- Previewed loaded records using `SELECT * FROM raw_311_requests LIMIT 5`
+- Created `sql/verify_raw_load.sql` to store raw-load verification queries
+
+Key result:
+
+The raw NYC 311 dataset is now loaded into PostgreSQL and ready for SQL-based analysis and quality checks.
+
+New files created:
+
+- `sql/create_tables.sql`
+- `sql/verify_raw_load.sql`
+- `scripts/load_raw_to_postgres.py`
