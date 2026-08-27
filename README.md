@@ -42,8 +42,13 @@ DataGuard/
 │   ├── data_issues_report.csv
 │   └── auto_fix_report.csv
 ├── scripts/
-│   └── quality_checker.py
+│   ├── quality_checker.py
+│   └── test_db_connection.py
+├── sql/
+│   └── schema_design.md
+├── .gitignore
 └── README.md
+```
 
 ## Tools Used So Far
 
@@ -197,3 +202,31 @@ Script-generated outputs:
 Key result:
 
 The project now has a reusable Python script that can load the raw NYC 311 dataset, generate quality reports, apply basic cleaning, and export cleaned outputs automatically.
+
+### Day 8: PostgreSQL Setup and Database Design
+
+Completed:
+
+- Installed PostgreSQL locally
+- Installed pgAdmin 4
+- Created the local PostgreSQL database: `dataguard`
+- Verified the database using pgAdmin query tool
+- Installed `psycopg2-binary` so Python can connect to PostgreSQL
+- Created `scripts/test_db_connection.py`
+- Successfully connected Python to the `dataguard` database
+- Created the `sql` folder
+- Created `sql/schema_design.md`
+- Planned the core DataGuard database tables:
+  - `raw_311_requests`
+  - `clean_311_requests`
+  - `quality_log`
+  - `data_quality_alerts`
+
+Key result:
+
+The DataGuard project now has a working local PostgreSQL database and Python can connect to it successfully.
+
+New files created:
+
+- `scripts/test_db_connection.py`
+- `sql/schema_design.md`
