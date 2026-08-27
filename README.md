@@ -48,7 +48,8 @@ DataGuard/
 ├── sql/
 │   ├── schema_design.md
 │   ├── create_tables.sql
-│   └── verify_raw_load.sql
+│   ├── verify_raw_load.sql
+│   └── business_queries.sql
 ├── .gitignore
 └── README.md
 
@@ -258,3 +259,29 @@ New files created:
 - `sql/create_tables.sql`
 - `sql/verify_raw_load.sql`
 - `scripts/load_raw_to_postgres.py`
+
+### Day 10: SQL Business Queries
+
+Completed:
+
+- Created `sql/business_queries.sql`
+- Wrote SQL queries using `SELECT`, `COUNT`, `GROUP BY`, `ORDER BY`, `LIMIT`, `WHERE`, `CASE`, and `ILIKE`
+- Tested 10 business queries against the `raw_311_requests` table in PostgreSQL
+- Verified total raw request count
+- Analyzed top complaint types
+- Analyzed request volume by borough
+- Analyzed request status distribution
+- Analyzed agency workload
+- Analyzed city/location request volume
+- Analyzed common complaint descriptors
+- Analyzed noise complaints by borough
+- Grouped requests into closed vs not closed
+- Analyzed top complaint types in Brooklyn
+
+Key result:
+
+The DataGuard project now has a SQL business query layer that can analyze the raw NYC 311 data directly inside PostgreSQL.
+
+New file created:
+
+- `sql/business_queries.sql`
