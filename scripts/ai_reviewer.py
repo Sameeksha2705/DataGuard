@@ -8,8 +8,11 @@ Claude, asking it to:
 3. Flag where it disagrees with the rule-based severity, and why.
 
 The response must be valid JSON matching a fixed schema. If Claude's
-response isn't valid JSON, the call is retried once with a corrective
-follow-up message before giving up.
+response isn't valid JSON, the call is retried (up to MAX_ATTEMPTS total
+attempts) with a corrective follow-up message. If every attempt fails,
+the script exits cleanly with a clear message rather than an unhandled
+crash -- no partial data is ever saved, so it is always safe to simply
+rerun the script.
 
 Results are written to ai_incident_reports (per-issue assessments) and
 ai_root_cause_findings (cross-issue correlations).
@@ -32,6 +35,7 @@ from db_utils import get_postgres_connection
 
 MODEL = "claude-haiku-4-5-20251001"
 MAX_TOKENS = 2000
+MAX_ATTEMPTS = 3
 
 SYSTEM_PROMPT = """You are a data reliability analyst reviewing automated data \
 quality check results for a NYC 311 service request pipeline.
@@ -85,6 +89,12 @@ preamble or explanation outside the JSON. Match this schema exactly:
 issue_assessments must include exactly one entry for every rule_code in the \
 input, no more and no fewer. root_cause_findings may be an empty list if no \
 real correlation exists across the issues."""
+
+
+class AIReviewFailed(Exception):
+    """Raised when Claude fails to return valid, well-formed JSON after
+    every retry attempt has been exhausted. No data is saved when this
+    is raised -- it is always safe to simply rerun the script."""
 
 
 def get_api_key():
@@ -160,29 +170,40 @@ def parse_ai_response(raw_text):
     return json.loads(cleaned)
 
 
-def get_ai_assessment(client, context):
+def get_ai_assessment(client, context, max_attempts=MAX_ATTEMPTS):
     """
     Sends the run context to Claude and returns the parsed JSON response.
-    Retries once with a corrective message if the first response isn't
-    valid JSON.
+    Retries up to max_attempts total times with a corrective message each
+    time the response fails to parse. Raises AIReviewFailed if every
+    attempt fails -- the caller should treat this as "nothing was saved,
+    safe to rerun," not as a crash.
     """
     user_content = json.dumps(context)
+    attempt_content = user_content
+    last_error = None
 
-    raw_response = call_claude(client, user_content)
+    for attempt in range(1, max_attempts + 1):
+        print(f"[debug] Attempt {attempt} of {max_attempts}...")
+        raw_response = call_claude(client, attempt_content)
 
-    try:
-        return parse_ai_response(raw_response)
-    except json.JSONDecodeError as error:
-        print(f"[debug] First response failed to parse as JSON: {error}")
-        retry_prompt = (
-            f"Your previous response was not valid JSON. Here it was:\n\n"
-            f"{raw_response}\n\n"
-            f"Respond again with ONLY the valid JSON object, matching the "
-            f"schema described earlier. No markdown, no code fences, no "
-            f"other text."
-        )
-        raw_retry = call_claude(client, retry_prompt)
-        return parse_ai_response(raw_retry)
+        try:
+            return parse_ai_response(raw_response)
+        except json.JSONDecodeError as error:
+            last_error = error
+            print(f"[debug] Attempt {attempt} failed to parse as JSON: {error}")
+            attempt_content = (
+                f"Your previous response was not valid JSON. Here it was:\n\n"
+                f"{raw_response}\n\n"
+                f"Respond again with ONLY the valid JSON object, matching the "
+                f"schema described earlier. No markdown, no code fences, no "
+                f"other text."
+            )
+
+    raise AIReviewFailed(
+        f"Claude failed to return valid JSON after {max_attempts} attempts. "
+        f"Last parse error: {last_error}. Nothing was saved for this run; "
+        f"it is safe to simply rerun the script."
+    )
 
 
 def validate_assessment_shape(assessment, expected_rule_codes):
@@ -265,7 +286,11 @@ def main():
     client = Anthropic(api_key=get_api_key())
 
     print("Calling Claude...")
-    assessment = get_ai_assessment(client, context)
+    try:
+        assessment = get_ai_assessment(client, context)
+    except AIReviewFailed as error:
+        print(f"\nAI review failed: {error}")
+        return
 
     print("Validating response shape...")
     validate_assessment_shape(assessment, expected_rule_codes)

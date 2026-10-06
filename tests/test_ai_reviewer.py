@@ -158,4 +158,51 @@ def test_call_claude_raises_when_no_text_block_present():
 
     with pytest.raises(ValueError):
         ar.call_claude(mock_client, "some user content")
-        
+
+
+# ---------------------------------------------------------------------------
+# get_ai_assessment (retry logic)
+# ---------------------------------------------------------------------------
+
+def test_get_ai_assessment_succeeds_on_first_attempt():
+    mock_client = MagicMock()
+    mock_client.messages.create.return_value = _make_mock_message(
+        '{"issue_assessments": [], "root_cause_findings": []}'
+    )
+
+    result = ar.get_ai_assessment(mock_client, {"some": "context"})
+
+    assert result == {"issue_assessments": [], "root_cause_findings": []}
+    assert mock_client.messages.create.call_count == 1
+
+
+def test_get_ai_assessment_succeeds_after_one_malformed_attempt():
+    mock_client = MagicMock()
+    # First call returns garbage, second call returns valid JSON.
+    mock_client.messages.create.side_effect = [
+        _make_mock_message("not valid json"),
+        _make_mock_message('{"issue_assessments": [], "root_cause_findings": []}'),
+    ]
+
+    result = ar.get_ai_assessment(mock_client, {"some": "context"}, max_attempts=3)
+
+    assert result == {"issue_assessments": [], "root_cause_findings": []}
+    assert mock_client.messages.create.call_count == 2
+
+
+def test_get_ai_assessment_raises_ai_review_failed_after_all_attempts_exhausted():
+    """
+    Covers the real failure mode that happened during development: the
+    first response and the retry both failed to parse. With only one
+    retry, this crashed with an unhandled JSONDecodeError. This test
+    confirms that after max_attempts is exhausted, a clean
+    AIReviewFailed is raised instead of letting the raw JSONDecodeError
+    propagate.
+    """
+    mock_client = MagicMock()
+    mock_client.messages.create.return_value = _make_mock_message("still not valid json")
+
+    with pytest.raises(ar.AIReviewFailed):
+        ar.get_ai_assessment(mock_client, {"some": "context"}, max_attempts=3)
+
+    assert mock_client.messages.create.call_count == 3
