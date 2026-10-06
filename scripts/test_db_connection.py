@@ -1,40 +1,36 @@
 """
-DataGuard PostgreSQL Connection Test
+Test PostgreSQL Connection for DataGuard
 
-This script checks whether Python can connect to the local DataGuard PostgreSQL database.
+This script verifies that Python can connect to the local PostgreSQL
+DataGuard database using the shared database utility module.
 """
 
-import getpass
-import psycopg2
+from db_utils import get_postgres_connection
 
 
-def test_connection():
+def test_database_connection():
     """
-    Connects to the local PostgreSQL DataGuard database and runs a test query.
+    Connects to PostgreSQL and prints the current database name.
     """
-    password = getpass.getpass("Enter PostgreSQL password: ")
+    connection = None
 
-    connection = psycopg2.connect(
-        host="localhost",
-        port=5432,
-        database="dataguard",
-        user="postgres",
-        password=password
-    )
+    try:
+        connection = get_postgres_connection()
 
-    cursor = connection.cursor()
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT current_database();")
+            current_database = cursor.fetchone()[0]
 
-    cursor.execute("SELECT current_database();")
-    database_name = cursor.fetchone()[0]
+        print(f"Connected successfully. Current database: {current_database}")
 
-    print("Connected successfully.")
-    print("Current database:", database_name)
+    except Exception as error:
+        print("Database connection failed.")
+        print(f"Error: {error}")
 
-    cursor.close()
-    connection.close()
+    finally:
+        if connection:
+            connection.close()
 
 
 if __name__ == "__main__":
-    test_connection()
-
-    
+    test_database_connection()

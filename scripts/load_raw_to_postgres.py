@@ -1,74 +1,109 @@
 """
-DataGuard Raw Data Loader
+Load NYC 311 Raw Data into PostgreSQL
 
-This script loads selected columns from the raw NYC 311 CSV file
-into the PostgreSQL raw_311_requests table.
+This script loads selected NYC 311 raw columns into the stg_311_requests
+staging table.
+
+It uses a replace-load pattern:
+1. Read the local raw CSV file.
+2. Validate that required columns exist.
+3. Clear the existing stg_311_requests table.
+4. Load the fresh 100,000 records, tagged with a new load_id for this run.
+
+This makes the script safe to rerun during development:
+running it multiple times will still leave the table with 100,000 rows,
+not duplicated rows.
 """
 
-import getpass
+import uuid
 from pathlib import Path
 
 import pandas as pd
-import psycopg2
 from psycopg2.extras import execute_values
 
+from db_utils import get_postgres_connection
 
-def load_raw_data():
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+RAW_DATA_PATH = PROJECT_ROOT / "data" / "nyc_311_raw_100k.csv"
+
+RAW_COLUMNS = [
+    "unique_key",
+    "created_date",
+    "closed_date",
+    "agency",
+    "agency_name",
+    "complaint_type",
+    "descriptor",
+    "location_type",
+    "incident_zip",
+    "incident_address",
+    "street_name",
+    "address_type",
+    "city",
+    "status",
+    "borough",
+    "resolution_description",
+    "resolution_action_updated_date",
+    "latitude",
+    "longitude",
+]
+
+BATCH_SIZE = 5000
+
+
+def load_raw_csv(file_path):
     """
-    Loads raw NYC 311 data from CSV into PostgreSQL.
+    Loads the NYC 311 raw CSV and keeps only the columns used by DataGuard.
     """
-    project_root = Path(__file__).resolve().parent.parent
-    raw_data_path = project_root / "data" / "nyc_311_raw_100k.csv"
+    if not file_path.exists():
+        raise FileNotFoundError(f"Raw data file not found: {file_path}")
 
-    if not raw_data_path.exists():
-        raise FileNotFoundError(f"Raw data file not found: {raw_data_path}")
+    dataframe = pd.read_csv(file_path)
 
-    print("Loading raw CSV...")
-    df = pd.read_csv(raw_data_path)
-
-    columns_to_load = [
-        "unique_key",
-        "created_date",
-        "closed_date",
-        "agency",
-        "agency_name",
-        "complaint_type",
-        "descriptor",
-        "location_type",
-        "incident_zip",
-        "incident_address",
-        "street_name",
-        "address_type",
-        "city",
-        "status",
-        "borough",
-        "resolution_description",
-        "resolution_action_updated_date",
-        "latitude",
-        "longitude"
+    missing_columns = [
+        column for column in RAW_COLUMNS
+        if column not in dataframe.columns
     ]
 
-    df_load = df[columns_to_load].copy()
+    if missing_columns:
+        raise ValueError(
+            f"The raw data file is missing required columns: {missing_columns}"
+        )
 
-    # Convert pandas missing values to Python None so PostgreSQL stores them as NULL.
-    df_load = df_load.where(pd.notnull(df_load), None)
+    dataframe = dataframe[RAW_COLUMNS].copy()
 
-    print("Rows prepared for loading:", len(df_load))
+    # Convert pandas missing values such as NaN into Python None
+    # so PostgreSQL stores them as NULL.
+    dataframe = dataframe.astype(object).where(pd.notna(dataframe), None)
 
-    password = getpass.getpass("Enter PostgreSQL password: ")
+    return dataframe
 
-    connection = psycopg2.connect(
-        host="localhost",
-        port=5432,
-        database="dataguard",
-        user="postgres",
-        password=password
-    )
 
-    cursor = connection.cursor()
+def get_staging_table_count(cursor):
+    """
+    Returns the number of records currently stored in stg_311_requests.
+    """
+    cursor.execute("SELECT COUNT(*) FROM stg_311_requests;")
+    return cursor.fetchone()[0]
 
+
+def clear_staging_table(cursor):
+    """
+    Clears the staging table before loading fresh data.
+
+    RESTART IDENTITY resets the auto-incrementing record_id column.
+    """
+    cursor.execute("TRUNCATE TABLE stg_311_requests RESTART IDENTITY;")
+
+
+def insert_staging_records(cursor, dataframe, load_id):
+    """
+    Inserts NYC 311 records into the staging table, tagging every row
+    with the same load_id for this run.
+    """
     insert_query = """
-        INSERT INTO raw_311_requests (
+        INSERT INTO stg_311_requests (
             unique_key,
             created_date,
             closed_date,
@@ -87,24 +122,69 @@ def load_raw_data():
             resolution_description,
             resolution_action_updated_date,
             latitude,
-            longitude
+            longitude,
+            load_id
         )
-        VALUES %s
+        VALUES %s;
     """
 
-    records = list(df_load.itertuples(index=False, name=None))
+    records = [
+        tuple(row) + (load_id,)
+        for row in dataframe.to_numpy()
+    ]
 
-    print("Loading records into PostgreSQL...")
-    execute_values(cursor, insert_query, records)
+    execute_values(
+        cursor,
+        insert_query,
+        records,
+        page_size=BATCH_SIZE
+    )
 
-    connection.commit()
+    return len(records)
 
-    print("Raw data loaded successfully.")
-    print("Rows inserted:", len(records))
 
-    cursor.close()
-    connection.close()
+def main():
+    """
+    Runs the staging data loading process.
+    """
+    connection = None
+    load_id = str(uuid.uuid4())
+
+    try:
+        dataframe = load_raw_csv(RAW_DATA_PATH)
+        print(f"Raw records prepared for loading: {len(dataframe)}")
+        print(f"Load ID for this run: {load_id}")
+
+        connection = get_postgres_connection()
+
+        with connection.cursor() as cursor:
+            records_before_load = get_staging_table_count(cursor)
+            print(f"Records before load: {records_before_load}")
+
+            clear_staging_table(cursor)
+            print("Existing staging table records cleared.")
+
+            inserted_records = insert_staging_records(cursor, dataframe, load_id)
+
+            records_after_load = get_staging_table_count(cursor)
+
+        connection.commit()
+
+        print(f"Records inserted: {inserted_records}")
+        print(f"Records after load: {records_after_load}")
+        print("Staging data load completed successfully.")
+
+    except Exception as error:
+        if connection:
+            connection.rollback()
+
+        print("Staging data load failed.")
+        print(f"Error: {error}")
+
+    finally:
+        if connection:
+            connection.close()
 
 
 if __name__ == "__main__":
-    load_raw_data()
+    main()

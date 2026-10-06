@@ -1,10 +1,9 @@
 issue_category,issue_name,column_name,issue_count,severity,description,recommended_action
-Duplicates,Full-row duplicate records,All columns,0,Low,Records that are completely duplicated across all columns.,Remove full-row duplicates if found.
-Duplicates,Duplicate unique_key values,unique_key,0,Low,The unique_key column should uniquely identify each service request.,Investigate duplicate keys before removing records.
-Data Types,Date columns loaded as object/text,"created_date, closed_date, due_date, resolution_action_updated_date",4,Medium,Date columns should be converted to datetime format for time-based analysis.,Convert date columns using pd.to_datetime(errors='coerce').
-Data Types,incident_zip loaded as float,incident_zip,1,Medium,"ZIP codes are identifiers, not numeric measurements.",Create a cleaned ZIP code string column.
-Formatting,Unspecified borough values,borough,126,Medium,Some records do not have a specific borough assigned.,Review unspecified borough records before geographic analysis.
-Formatting,Unexpected status values,status,0,Low,Status values should match the expected set of request statuses.,Review unexpected status values if found.
-Formatting / Consistency,Missing city values,city,5999,Medium,The city column has missing values and may contain mixed geographic levels.,Review city values before city-level reporting.
-Suspicious Values,Negative resolution time,"created_date, closed_date",39,High,Some records have closed_date earlier than created_date.,Flag these records for review before resolution-time analysis.
-Suspicious Values,Coordinates outside broad NYC-area range,"latitude, longitude",0,Low,Latitude and longitude should fall within a broad NYC-area range.,Review invalid coordinates if found.
+Duplicates,Full-row duplicate records,All columns,0,Low,Checks whether any complete rows are repeated exactly.,No action needed.
+Duplicates,Duplicate unique_key values,unique_key,0,Low,Checks whether the request ID uniquely identifies each 311 service request.,No action needed.
+Data Types,Date columns loaded as object/text,"created_date, closed_date, due_date, resolution_action_updated_date",4,Medium,Date-related columns were loaded as object/text and required conversion to datetime for reliable time-based analysis.,Convert date columns to datetime during the cleaning step using pd.to_datetime(errors='coerce').
+Data Types,incident_zip loaded as float,incident_zip,99189,Medium,"incident_zip is stored as float64, causing ZIP codes to appear with decimal formatting even though ZIP codes are identifiers.",Convert incident_zip to a cleaned string format during the cleaning step.
+Formatting,Unspecified borough values,borough,126,Medium,Checks for records where borough is labeled as Unspecified instead of a specific NYC borough.,Review Unspecified borough records during location data quality checks.
+Formatting / Consistency,Mixed geographic levels in city field,city,5999,Medium,"The city column contains a mix of borough names, city names, neighborhood/location names, and missing values.","Review city values and decide whether to standardize, map to boroughs, or use borough/ZIP/location fields for geographic analysis."
+Suspicious Values,Negative resolution time,"created_date, closed_date",39,High,"Checks whether closed_date occurs before created_date, creating an invalid negative resolution time.",Flag these records for review before using resolution-time analysis.
+Suspicious Values,Coordinates outside broad NYC-area range,"latitude, longitude",0,Low,Checks whether available latitude/longitude values fall outside a broad expected NYC-area range.,No action needed for coordinate range.

@@ -6,15 +6,15 @@
 DROP TABLE IF EXISTS data_quality_alerts;
 DROP TABLE IF EXISTS quality_log;
 DROP TABLE IF EXISTS clean_311_requests;
-DROP TABLE IF EXISTS raw_311_requests;
+DROP TABLE IF EXISTS stg_311_requests;
 
 
--- 1. Raw NYC 311 service requests table
--- Stores selected important fields from the original raw dataset.
+-- 1. Staging table for raw NYC 311 service requests
+-- Stores selected fields from the original raw dataset, tagged by load batch.
 
-CREATE TABLE raw_311_requests (
+CREATE TABLE stg_311_requests (
     record_id SERIAL PRIMARY KEY,
-    unique_key BIGINT,
+    unique_key BIGINT UNIQUE,
     created_date TEXT,
     closed_date TEXT,
     agency TEXT,
@@ -32,7 +32,9 @@ CREATE TABLE raw_311_requests (
     resolution_description TEXT,
     resolution_action_updated_date TEXT,
     latitude DOUBLE PRECISION,
-    longitude DOUBLE PRECISION
+    longitude DOUBLE PRECISION,
+    load_id UUID NOT NULL,
+    loaded_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 
@@ -59,17 +61,22 @@ CREATE TABLE clean_311_requests (
 
 
 -- 3. Quality log table
--- Stores data quality check results.
+-- Stores data quality check results, tagged by run for traceability.
 
 CREATE TABLE quality_log (
     check_id SERIAL PRIMARY KEY,
+    run_id UUID NOT NULL,
+    rule_code TEXT,
     check_name TEXT,
     issue_category TEXT,
+    table_name TEXT,
     column_name TEXT,
     issue_count INTEGER,
     severity TEXT,
+    business_impact TEXT,
     recommended_action TEXT,
-    check_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    check_status TEXT,
+    checked_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 

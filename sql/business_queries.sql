@@ -1,16 +1,16 @@
 -- DataGuard SQL Business Queries
 -- These queries analyze NYC 311 service request data loaded into PostgreSQL.
 
--- Query 1: Total number of raw service requests
+-- Query 1: Total number of service requests
 SELECT COUNT(*) AS total_requests
-FROM raw_311_requests;
+FROM stg_311_requests;
 
 
 -- Query 2: Top 10 complaint types
 SELECT 
     complaint_type,
     COUNT(*) AS complaint_count
-FROM raw_311_requests
+FROM stg_311_requests
 GROUP BY complaint_type
 ORDER BY complaint_count DESC
 LIMIT 10;
@@ -20,7 +20,7 @@ LIMIT 10;
 SELECT 
     borough,
     COUNT(*) AS request_count
-FROM raw_311_requests
+FROM stg_311_requests
 GROUP BY borough
 ORDER BY request_count DESC;
 
@@ -29,7 +29,7 @@ ORDER BY request_count DESC;
 SELECT 
     status,
     COUNT(*) AS status_count
-FROM raw_311_requests
+FROM stg_311_requests
 GROUP BY status
 ORDER BY status_count DESC;
 
@@ -38,7 +38,7 @@ ORDER BY status_count DESC;
 SELECT 
     agency,
     COUNT(*) AS request_count
-FROM raw_311_requests
+FROM stg_311_requests
 GROUP BY agency
 ORDER BY request_count DESC
 LIMIT 10;
@@ -48,7 +48,7 @@ LIMIT 10;
 SELECT 
     city,
     COUNT(*) AS request_count
-FROM raw_311_requests
+FROM stg_311_requests
 GROUP BY city
 ORDER BY request_count DESC
 LIMIT 10;
@@ -58,7 +58,7 @@ LIMIT 10;
 SELECT 
     descriptor,
     COUNT(*) AS descriptor_count
-FROM raw_311_requests
+FROM stg_311_requests
 GROUP BY descriptor
 ORDER BY descriptor_count DESC
 LIMIT 10;
@@ -68,7 +68,7 @@ LIMIT 10;
 SELECT 
     borough,
     COUNT(*) AS noise_complaint_count
-FROM raw_311_requests
+FROM stg_311_requests
 WHERE complaint_type ILIKE '%noise%'
 GROUP BY borough
 ORDER BY noise_complaint_count DESC;
@@ -81,7 +81,7 @@ SELECT
         ELSE 'Not Closed'
     END AS closure_group,
     COUNT(*) AS request_count
-FROM raw_311_requests
+FROM stg_311_requests
 GROUP BY closure_group
 ORDER BY request_count DESC;
 
@@ -90,7 +90,7 @@ ORDER BY request_count DESC;
 SELECT 
     complaint_type,
     COUNT(*) AS complaint_count
-FROM raw_311_requests
+FROM stg_311_requests
 WHERE borough = 'BROOKLYN'
 GROUP BY complaint_type
 ORDER BY complaint_count DESC
