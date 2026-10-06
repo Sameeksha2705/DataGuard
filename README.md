@@ -1,583 +1,152 @@
 # DataGuard
 
-DataGuard is a 30-day data engineering and analytics project focused on building an automated data quality pipeline with AI-powered business intelligence.
+**An AI-assisted data reliability pipeline for NYC 311 service request data.**
 
-The project uses the NYC 311 service requests dataset as a real-world public dataset. The goal is to move from raw data discovery to data quality checks, cleaning, SQL analysis, pipeline automation, cloud storage, dashboards, and an AI-powered business question-answering layer.
+DataGuard ingests raw public service-request data, runs it through a rule-driven SQL quality engine, and layers an AI reviewer on top that correlates issues across a pipeline run, independently judges severity, and automatically routes each issue to the right outcome: a logged alert, a human-review queue, or (for rules that genuinely qualify) an auto-applied mechanical fix.
 
-## Current Progress
+The goal isn't just to find bad data. It's to decide, automatically and defensibly, what should happen next.
 
-### Day 1: NYC 311 Data Discovery
+## Key Results
 
-Completed:
+- **100,000+ real NYC 311 records** processed through a staging to clean to quality-check pipeline
+- **10 rule-driven SQL quality checks**, with severity thresholds and business impact stored in a database table, not hardcoded
+- **A ZIP-code-based backfill** that resolved 10 of 126 "Unspecified" borough records and reduced missing city values from 5,999 to 0, with the unresolved cases left honestly flagged rather than faked
+- **An AI reliability agent** (Claude) that reads every failed check in a run together, proposes a shared root cause, and independently classifies severity and recommended action
+- **66.7% agreement rate** between the AI's severity judgment and the deterministic rule engine across 9 assessments, with every disagreement following a consistent, explainable pattern (see the [Build Log](docs/BUILD_LOG.md) for the full breakdown)
+- **Automated remediation routing**: AI-flagged issues automatically create entries in `data_quality_alerts` (block/warn) or queue to `proposed_fixes` for human review, no manual triage required
+- **55 passing automated tests** covering the cleaning pipeline, the AI context builder, the AI reviewer, and the remediation router, using mocked database and API calls
 
-* Set up a professional project folder structure
-* Created the first Jupyter notebook
-* Verified the Anaconda Python kernel and pandas setup
-* Loaded a 100,000-row sample of the NYC 311 dataset
-* Confirmed the dataset contains 100,000 rows and 44 columns
-* Created a column inventory with column names and data types
-* Previewed the first and last records using `head()` and `tail()`
-* Reviewed data types and dataset structure using `dtypes` and `info()`
-* Previewed missing values across columns
+## Architecture
+
+```
+Raw CSV (NYC Open Data)
+      |
+      v
+stg_311_requests        (staging: load_id + loaded_at tagging, UNIQUE constraint)
+      |
+      v
+clean_311_requests       (parsed dates, cleaned ZIP codes, ZIP-based borough/city backfill)
+      |
+      v
+quality_checks.sql       (10 rule-driven checks, run against either layer, results in quality_log)
+      |
+      v
+AI Reviewer (Claude)      (correlates failed checks, independently judges severity/action)
+      |
+      v
+Automated Remediation
+  |- block / warn       -> data_quality_alerts (automatic)
+  |- human_review       -> proposed_fixes (queued, nothing auto-applied)
+  `- auto_fix_candidate -> true auto-apply tier (Low/Medium severity only)
+```
+
+## Tech Stack
+
+- **Python**: pandas, psycopg2, pytest, unittest.mock
+- **PostgreSQL**: schema design, PL/pgSQL functions, foreign keys, CHECK constraints, native array columns
+- **Claude API** (model: `claude-haiku-4-5-20251001`): structured JSON output, validated and retried on malformed responses
+- **SQL**: parameterized dynamic queries, CTEs, window-style severity classification
 
 ## Project Structure
 
 ```text
 DataGuard/
-├── data/
-│   ├── nyc_311_raw_100k.csv
-│   ├── nyc_311_cleaned_day5.csv
-│   └── nyc_311_cleaned.csv
-├── notebooks/
-│   ├── 01_nyc311_data_discovery.ipynb
-│   ├── 02_nyc311_basic_business_questions.ipynb
-│   ├── 03_nyc311_missing_value_report.ipynb
-│   ├── 04_nyc311_data_issues_report.ipynb
-│   └── 05_nyc311_auto_fix_functions.ipynb
-├── reports/
-│   ├── missing_value_report_day3.csv
-│   ├── data_issues_report_day4.csv
-│   ├── auto_fix_report_day5.csv
-│   ├── missing_value_report.csv
-│   ├── data_issues_report.csv
-│   └── auto_fix_report.csv
-├── scripts/
-│   ├── db_utils.py
-│   ├── quality_checker.py
-│   ├── test_db_connection.py
-│   └── load_raw_to_postgres.py
-├── sql/
-│   ├── schema_design.md
-│   ├── create_tables.sql
-│   ├── verify_raw_load.sql
-│   ├── business_queries.sql
-│   ├── quality_rules.sql
-│   ├── quality_checks.sql
-│   ├── verify_quality_log.sql
-│   └── migrations/
-│       ├── 001_add_rule_fields_to_quality_log.sql
-│       └── 002_add_table_name_to_quality_log.sql
-├── .env.example
-├── .gitignore
-└── README.md
+|-- data/                          # Raw CSV (gitignored, not committed)
+|-- notebooks/                     # Early exploratory analysis (Days 1-5)
+|-- reports/                       # Generated CSV reports (missing values, data issues, auto-fix)
+|-- docs/
+|   `-- BUILD_LOG.md               # Full day-by-day build history, bugs found and fixed
+|-- scripts/
+|   |-- db_utils.py                 # Centralized PostgreSQL connection handling
+|   |-- quality_checker.py          # Cleaning, backfill, and reporting functions
+|   |-- load_raw_to_postgres.py     # Loads raw CSV into staging
+|   |-- load_clean_to_postgres.py   # Applies cleaning, loads into clean table
+|   |-- build_context.py            # Gathers a run's failed checks for the AI
+|   |-- ai_reviewer.py              # Sends context to Claude, validates, saves results
+|   |-- apply_remediation.py        # Routes AI assessments to alerts or human review
+|   `-- generate_synthetic_runs.py  # Synthetic scenarios for AI stress-testing
+|-- sql/
+|   |-- create_tables.sql           # Core schema
+|   |-- quality_rules.sql           # Rule definitions and severity thresholds
+|   |-- quality_checks.sql          # Parameterized quality-check function
+|   |-- ai_tables.sql                # AI layer tables
+|   |-- proposed_fixes_table.sql     # Human-review queue table
+|   |-- business_queries.sql         # Analytical queries, staging vs. clean comparisons
+|   |-- verify_raw_load.sql / verify_quality_log.sql / verify_ai_layer.sql
+|   `-- migrations/
+|-- tests/                          # 55 tests across the full pipeline
+|-- .env.example
+`-- .gitignore
 ```
 
-## Setup Instructions
+## Setup & Usage
 
 ### Prerequisites
 
-- Python 3.13 (or similar) with `pip`
-- PostgreSQL installed locally, with a database named `dataguard` created
-- pgAdmin 4 (or another PostgreSQL client) for running SQL files
+- Python 3.13+ with `pip`
+- PostgreSQL, with a database named `dataguard` created
+- pgAdmin 4 (or another PostgreSQL client)
+- An Anthropic API key (for the AI reviewer layer)
 
-### 1. Install Python dependencies
-
-From the project root:
-
-```
-pip install pandas psycopg2-binary
-```
-
-### 2. Configure database credentials
-
-Copy `.env.example` to `.env` and fill in your values, or set the following environment variables directly in your terminal session:
-
-- `DATAGUARD_DB_HOST` (default: `localhost`)
-- `DATAGUARD_DB_PORT` (default: `5432`)
-- `DATAGUARD_DB_NAME` (default: `dataguard`)
-- `DATAGUARD_DB_USER` (default: `postgres`)
-- `DATAGUARD_DB_PASSWORD` (optional — if not set, scripts will prompt for it securely at runtime)
-
-### 3. Create the database schema
-
-In pgAdmin's Query Tool (connected to the `dataguard` database), run, in this order:
-
-1. `sql/create_tables.sql` — creates `stg_311_requests`, `clean_311_requests`, `quality_log`, `data_quality_alerts`
-2. `sql/quality_rules.sql` — creates and populates `quality_rules`
-
-### 4. Generate the cleaned dataset and reports
-
-From `scripts/`:
+### 1. Install dependencies
 
 ```
-python quality_checker.py
+pip install pandas psycopg2-binary anthropic pytest
 ```
 
-This produces the missing value report, data issues report, cleaned CSV, and auto-fix report.
+### 2. Configure credentials
 
-### 5. Load raw data into PostgreSQL
+Copy `.env.example` to `.env`, or set these as environment variables:
 
-From `scripts/`:
+- `DATAGUARD_DB_HOST`, `DATAGUARD_DB_PORT`, `DATAGUARD_DB_NAME`, `DATAGUARD_DB_USER` (defaults provided; password prompts securely if not set)
+- `DATAGUARD_ANTHROPIC_API_KEY` (required for the AI reviewer)
+
+### 3. Build the database schema
+
+In pgAdmin's Query Tool, run in order:
 
 ```
-python load_raw_to_postgres.py
+sql/create_tables.sql
+sql/quality_rules.sql
+sql/ai_tables.sql
+sql/proposed_fixes_table.sql
 ```
 
-This loads `data/nyc_311_raw_100k.csv` into `stg_311_requests`, tagging every row with a `load_id` for this run.
+### 4. Run the pipeline
 
-### 6. Run the quality checks
+```
+cd scripts
+python quality_checker.py            # Generates local reports
+python load_raw_to_postgres.py       # Loads raw data into staging
+python load_clean_to_postgres.py     # Applies cleaning, loads into clean table
+```
 
-In pgAdmin, run `sql/quality_checks.sql` against the `dataguard` database. Results are logged to `quality_log`, tagged with a `run_id` for this run.
+Then, in pgAdmin, run `sql/quality_checks.sql` to execute the quality checks against both tables.
 
-### 7. Verify results
+### 5. Run the AI reviewer
 
-Run `sql/verify_raw_load.sql` and `sql/verify_quality_log.sql` in pgAdmin to confirm the load and quality checks completed as expected.
+```
+python build_context.py              # Inspect what context would be sent (optional)
+python ai_reviewer.py                # Sends context to Claude, saves assessment
+python apply_remediation.py          # Routes the assessment to alerts or review
+```
 
-## Tools Used So Far
+### 6. Verify results
 
-* Python
-* pandas
-* Jupyter Notebook
-* VS Code
-* Anaconda
-* NYC Open Data
-* PostgreSQL
-* pgAdmin 4
+Run `sql/verify_raw_load.sql`, `sql/verify_quality_log.sql`, and `sql/verify_ai_layer.sql` in pgAdmin.
 
-## Next Step
+## Testing
 
-Day 2 will focus on using pandas to answer basic business questions about the NYC 311 dataset, including complaint types, borough-level complaint volume, agency workload, request statuses, and date ranges.
+```
+pytest tests/ -v
+```
 
-### Day 2: Basic Pandas Business Questions
+55 tests, all using mocked database cursors and a mocked Claude client, so the suite runs in a few seconds with no live database or API dependency.
 
-Completed:
+## Known Limitations & Honest Scope
 
-- Created the second notebook: `02_nyc311_basic_business_questions.ipynb`
-- Loaded the 100,000-row NYC 311 dataset sample
-- Practiced selecting individual and multiple columns
-- Used `value_counts()` to summarize complaint types, boroughs, agencies, and statuses
-- Filtered records for Brooklyn complaints, noise-related complaints, and Brooklyn noise complaints
-- Sorted records by `created_date`
-- Converted `created_date` and `closed_date` to datetime format
-- Answered 10 basic business questions using pandas
+- The ZIP-based borough backfill cannot resolve records missing both a borough and a usable ZIP code. A coordinate-based (point-in-polygon) fallback was scoped but deliberately deferred as a stretch goal, not included in this pass.
+- The AI's 66.7% agreement rate is drawn from 1 real pipeline run plus 4 deliberately varied synthetic scenarios (clearly labeled `synthetic_test_data` in the database), used to stress-test the mechanism beyond what one real run could show. It is not a claim of statistically meaningful calibration, which would require many real runs accumulated over real time.
+- The true mechanical auto-apply tier is currently empty by design: none of DataGuard's 10 quality rules represent a fix that's safe to apply without human judgment. The infrastructure exists for a rule that would genuinely qualify.
 
-Key findings:
-
-- `Illegal Parking` is the most common complaint type in the sample.
-- Brooklyn has the highest number of 311 requests.
-- NYPD handles the largest number of requests in this sample.
-- Most requests are marked as `Closed`.
-- The sample covers requests created between June 16, 2026 and June 26, 2026.
-- The `city` column may need review later because it contains both borough names and neighborhood/location names.
-
-### Day 3: Missing Value Report
-
-Completed:
-
-- Created the third notebook: `03_nyc311_missing_value_report.ipynb`
-- Created a `reports/` folder for exported project reports
-- Used `isnull()` to detect missing values
-- Calculated missing counts and missing percentages for all columns
-- Created a structured missing value report table
-- Added percentage-based missing severity classifications
-- Added business importance classifications
-- Added recommended actions for future handling
-- Reviewed critical, important, and conditional fields
-- Verified that missing `closed_date` values are associated with non-closed request statuses
-- Validated examples of conditional missingness in taxi and bridge/highway fields
-- Exported the final report as `reports/missing_value_report_day3.csv`
-
-Key findings:
-
-- 33 out of 44 columns contain at least one missing value.
-- 11 columns have no missing values.
-- All critical columns have 0 missing values.
-- `closed_date` has 25.095% missingness, but the missing values appear expected because those records have non-closed statuses.
-- Several highly missing fields are conditional fields that only apply to certain complaint or location types.
-- Missing values must be interpreted using business context, not just raw percentages.
-
-### Day 4: Data Issues Report
-
-Completed:
-
-- Created the fourth notebook: `04_nyc311_data_issues_report.ipynb`
-- Checked for full-row duplicate records
-- Checked for duplicate `unique_key` values
-- Reviewed column data types
-- Converted date columns to datetime format for quality checks
-- Identified date columns that were originally loaded as object/text
-- Identified `incident_zip` as a data type/formatting concern because ZIP codes were loaded as floats
-- Checked formatting consistency in `borough` and `status`
-- Reviewed the `city` column for mixed geographic levels
-- Created `resolution_time` using `closed_date - created_date`
-- Identified records with negative resolution time
-- Checked latitude and longitude ranges for suspicious coordinate values
-- Created and exported the Day 4 data issues report as `reports/data_issues_report_day4.csv`
-
-Key findings:
-
-- There are 0 full-row duplicate records.
-- There are 0 duplicate `unique_key` values.
-- Date-related columns need datetime conversion before reliable time-based analysis.
-- `incident_zip` should be treated as an identifier/location code rather than a numeric measurement.
-- The `borough` and `status` columns appear mostly standardized.
-- The `city` column contains mixed geographic levels, including borough names and neighborhood/location names.
-- There are 39 records with negative resolution time, where `closed_date` occurs before `created_date`.
-- Available latitude and longitude values fall within a broad NYC-area range.
-
-### Day 5: Auto-Fix Functions
-
-Completed:
-
-- Created the fifth notebook: `05_nyc311_auto_fix_functions.ipynb`
-- Preserved the raw dataset as `df`
-- Created a cleaned working copy called `df_clean`
-- Wrote reusable auto-fix functions for common data quality issues
-- Standardized selected text columns using `str.strip()` and `str.upper()`
-- Parsed date columns into datetime format
-- Created a cleaned ZIP code column called `incident_zip_clean`
-- Removed full-row duplicates safely
-- Removed duplicate `unique_key` records safely
-- Created a `resolution_time` column using `closed_date - created_date`
-- Created and exported the Day 5 auto-fix report
-- Exported the cleaned dataset as `data/nyc_311_cleaned_day5.csv`
-
-Key findings:
-
-- The raw dataset has 100,000 rows and 44 columns.
-- The cleaned dataset has 100,000 rows and 46 columns.
-- Two new columns were created: `incident_zip_clean` and `resolution_time`.
-- Date columns were successfully converted from object/text format to datetime format.
-- ZIP codes were cleaned from float values like `11211.0` into string values like `11211`.
-- 0 full-row duplicate records were removed.
-- 0 duplicate `unique_key` records were removed.
-- 74,905 records have valid `resolution_time`.
-- 25,095 records have missing `resolution_time`.
-- 39 records still have negative `resolution_time` and should be flagged for review instead of silently fixed.
-
-Outputs created:
-
-- `data/nyc_311_cleaned_day5.csv`
-- `reports/auto_fix_report_day5.csv`
-
-### Day 6: Reusable Quality Checker Script
-
-Completed:
-
-- Created the first reusable backend script: `scripts/quality_checker.py`
-- Refactored Day 3 missing value logic into reusable functions
-- Refactored Day 4 data issue checks into reusable functions
-- Refactored Day 5 auto-fix cleaning logic into reusable functions
-- Added functions for loading data and creating output folders
-- Added duplicate-check functions
-- Added missing value severity classification
-- Added data issues report generation
-- Added basic cleaning workflow
-- Added a `main()` function so the script can run end to end
-- Successfully ran the script from the terminal
-- Generated script-based output files automatically
-
-Script-generated outputs:
-
-- `data/nyc_311_cleaned.csv`
-- `reports/missing_value_report.csv`
-- `reports/data_issues_report.csv`
-- `reports/auto_fix_report.csv`
-
-Key result:
-
-The project now has a reusable Python script that can load the raw NYC 311 dataset, generate quality reports, apply basic cleaning, and export cleaned outputs automatically.
-
-### Day 8: PostgreSQL Setup and Database Design
-
-Completed:
-
-- Installed PostgreSQL locally
-- Installed pgAdmin 4
-- Created the local PostgreSQL database: `dataguard`
-- Verified the database using pgAdmin query tool
-- Installed `psycopg2-binary` so Python can connect to PostgreSQL
-- Created `scripts/test_db_connection.py`
-- Successfully connected Python to the `dataguard` database
-- Created the `sql` folder
-- Created `sql/schema_design.md`
-- Planned the core DataGuard database tables:
-  - `raw_311_requests`
-  - `clean_311_requests`
-  - `quality_log`
-  - `data_quality_alerts`
-
-Key result:
-
-The DataGuard project now has a working local PostgreSQL database and Python can connect to it successfully.
-
-New files created:
-
-- `scripts/test_db_connection.py`
-- `sql/schema_design.md`
-
-### Day 9: PostgreSQL Tables and Raw Data Load
-
-Completed:
-
-- Created `sql/create_tables.sql`
-- Created PostgreSQL tables for the DataGuard database:
-  - `raw_311_requests`
-  - `clean_311_requests`
-  - `quality_log`
-  - `data_quality_alerts`
-- Created `scripts/load_raw_to_postgres.py`
-- Loaded 100,000 raw NYC 311 records into the `raw_311_requests` table
-- Verified the raw table row count using SQL
-- Previewed loaded records using `SELECT * FROM raw_311_requests LIMIT 5`
-- Created `sql/verify_raw_load.sql` to store raw-load verification queries
-
-Key result:
-
-The raw NYC 311 dataset is now loaded into PostgreSQL and ready for SQL-based analysis and quality checks.
-
-New files created:
-
-- `sql/create_tables.sql`
-- `sql/verify_raw_load.sql`
-- `scripts/load_raw_to_postgres.py`
-
-### Day 10: SQL Business Queries
-
-Completed:
-
-- Created `sql/business_queries.sql`
-- Wrote SQL queries using `SELECT`, `COUNT`, `GROUP BY`, `ORDER BY`, `LIMIT`, `WHERE`, `CASE`, and `ILIKE`
-- Tested 10 business queries against the `raw_311_requests` table in PostgreSQL
-- Verified total raw request count
-- Analyzed top complaint types
-- Analyzed request volume by borough
-- Analyzed request status distribution
-- Analyzed agency workload
-- Analyzed city/location request volume
-- Analyzed common complaint descriptors
-- Analyzed noise complaints by borough
-- Grouped requests into closed vs not closed
-- Analyzed top complaint types in Brooklyn
-
-Key result:
-
-The DataGuard project now has a SQL business query layer that can analyze the raw NYC 311 data directly inside PostgreSQL.
-
-New file created:
-
-- `sql/business_queries.sql`
-
-### Day 11: Data Quality Rule Engine and Bug Fix
-
-Completed:
-
-- Created `sql/quality_rules.sql`, defining a `quality_rules` table storing severity thresholds and business impact per rule instead of hardcoding them in the check script
-- Populated `quality_rules` with 10 active rules covering completeness, uniqueness, validity, and consistency checks
-- Found and fixed a bug in `sql/quality_checks.sql` where `rule_code` and `business_impact` were missing from the `INSERT` statement, causing those columns to log as `NULL` in `quality_log` even though the join to `quality_rules` had the correct values available
-- Renamed `raw_311_requests` to `stg_311_requests` to reflect that it is a staging table holding 19 selected columns, not the full untouched 44-column source
-- Added a `UNIQUE` constraint on `unique_key` in `stg_311_requests`
-- Added `load_id` and `loaded_at` columns to `stg_311_requests` for load traceability
-- Added `run_id`, `rule_code`, `table_name`, `business_impact`, and `check_status` columns to `quality_log` for run traceability
-- Updated `load_raw_to_postgres.py` to generate a new `load_id` for each run and tag every inserted row with it
-- Rebuilt `scripts/quality_checker.py` as a proper Python script (it had previously and mistakenly been overwritten with SQL content), refactoring the Day 3, 4, and 5 notebook logic into reusable functions
-- Verified the `quality_checks.sql` fix end to end: `rule_code` and `business_impact` now populate correctly for all 10 rules in a single run, sharing one `run_id`
-
-Key result:
-
-The rule engine is now genuinely rule-driven end to end, from `quality_rules` through `quality_checks.sql` into `quality_log`, with every load and every check run traceable to a specific `load_id` and `run_id`.
-
-New/updated files:
-
-- `sql/quality_rules.sql`
-- `sql/quality_checks.sql`
-- `sql/create_tables.sql`
-- `sql/business_queries.sql`
-- `sql/verify_raw_load.sql`
-- `scripts/load_raw_to_postgres.py`
-- `scripts/quality_checker.py`
-- `.env.example`
-
-### Day 12: Clean Layer, ZIP-Based Backfill, and a Parameterized Quality Check Function
-
-Completed:
-
-- Created `scripts/load_clean_to_postgres.py`, which reads staged data from
-  `stg_311_requests`, applies the same cleaning functions used by
-  `quality_checker.py`, and loads the result into `clean_311_requests`
-- Fixed two bugs surfaced while building this: `parse_date_columns` assumed
-  a `due_date` column that isn't present in the staging table's narrower
-  column set, and `clean_zip_code` failed on ZIP codes returned from
-  PostgreSQL as stringified floats (e.g. `'11211.0'`) rather than real
-  floats
-- Added `get_borough_from_zip` and `backfill_borough_and_city` to
-  `quality_checker.py`, using documented USPS ZIP code ranges to fill in
-  missing or "Unspecified" borough values, and using the resulting
-  borough as a fallback for missing city values
-- Found and fixed a regression in the first version of the backfill: it
-  unconditionally overwrote `borough` with the result of the ZIP lookup,
-  even when that lookup failed and returned nothing -- silently turning
-  126 "Unspecified" (Medium severity) records into 116 genuinely missing
-  (High severity) records. Fixed by only overwriting when the lookup
-  actually succeeds, leaving unresolved records exactly as they were
-  rather than making them look worse
-- Rebuilt `sql/quality_checks.sql` as a parameterized PL/pgSQL function,
-  `run_quality_checks(target_table)`, that runs the same set of checks
-  against either `stg_311_requests` or `clean_311_requests`, with the
-  dynamic table name validated against an explicit allow-list and
-  isolated to a single temp-table-creation step
-- Made borough/status comparisons case-insensitive in the quality checks,
-  since the cleaning step uppercases text columns and an exact-case
-  comparison would silently stop matching cleaned data
-- `quality_log` no longer truncates between runs; each run is tagged with
-  its own `run_id` and `table_name`, building a running history instead
-  of only keeping the most recent run
-- Added `sql/business_queries.sql` queries comparing staging vs. clean
-  borough completeness directly, and an average-resolution-time-by-borough
-  query that only makes sense once `resolution_time` exists as a real
-  interval
-
-Key findings:
-
-- The ZIP-based backfill resolved 10 of 126 "Unspecified" borough records
-  (126 -> 116). The remaining 116 could not be resolved by ZIP code alone,
-  most likely because those records are missing a usable ZIP code as well,
-  not just a borough.
-- `missing_city` improved from 5,999 to 0, since city is backfilled from
-  the (partially fixed) borough value, and even an unresolved "UNSPECIFIED"
-  borough is a non-null fallback.
-- `missing_borough`, `negative_resolution_time`, and `invalid_coordinates`
-  are identical between staging and clean, as expected: the cleaning
-  pipeline fixes formatting and derivable values, not
-
-  ### Day 13: AI Reliability Agent and Automated Remediation Routing
-
-Completed:
-
-- Created `sql/ai_tables.sql`, defining `ai_incident_reports` (per-issue AI
-  severity/action assessments) and `ai_root_cause_findings` (cross-issue
-  correlations), both with a foreign key back to `quality_rules` so an AI
-  assessment can never reference a rule that doesn't exist
-- Created `scripts/build_context.py`, which gathers every failed check
-  from a specific (or most recent) quality check run, plus a handful of
-  real affected `unique_key` values per rule, as JSON ready to send to
-  an LLM
-- Created `scripts/ai_reviewer.py`, which sends that context to Claude
-  (model: `claude-haiku-4-5-20251001`) with a system prompt instructing
-  it to: correlate failed checks that share a likely root cause,
-  independently classify each issue's severity and recommended action,
-  and flag disagreements with the rule-based severity with a stated
-  reason
-- Found and fixed a real issue on the first run: Claude's response was
-  wrapped in a markdown code fence (` ```json ... ``` `) despite being
-  told not to, which broke direct JSON parsing. Added a
-  `strip_code_fences` step and debug logging of the raw response shape
-  before parsing, rather than guessing blindly at the failure
-- Added response validation (`validate_assessment_shape`) confirming the
-  AI's response covers exactly the expected set of rule_codes, no more
-  and no fewer, before anything is saved
-- Created `sql/verify_ai_layer.sql`: an overall and per-rule agreement-rate
-  query comparing the AI's severity judgment against the rule engine's,
-  a query surfacing the actual disagreement cases with stated reasons,
-  and a breakdown of how often each action type is recommended
-- Created the `proposed_fixes` table, with a `CHECK` constraint on
-  `status` so the database itself rejects an invalid status value
-- Created `scripts/apply_remediation.py` to act on the AI's
-  recommendations. Initial design routed every non-auto-fix assessment
-  into `proposed_fixes` uniformly, regardless of whether the AI said
-  `warn`, `block`, or `human_review` -- on review, this meant two of the
-  four possible AI actions never caused any real automated effect.
-  Redesigned so that `block` and `warn` now automatically create a row
-  in `data_quality_alerts`, a table defined in the original schema design
-  (Day 8) specifically to "identify which analytics should be trusted,
-  warned, or blocked," but left unpopulated until this point.
-  `human_review` still queues to `proposed_fixes`, since that action
-  means the AI isn't recommending a specific course of action.
-  `auto_fix_candidate` (Low/Medium severity only) is a true mechanical
-  auto-apply tier, implemented as infrastructure for a rule that would
-  genuinely qualify -- none of DataGuard's current 10 rules represent a
-  judgment-free fix, so this tier is expected to be empty, which is the
-  correct and honest outcome given the current rule set, not a gap
-
-Key findings:
-
-- On the first real run (2 failed checks: `unspecified_borough`,
-  `negative_resolution_time`), the AI's severity and action assessments
-  agreed with the rule engine on both. The more interesting and genuinely
-  novel output was the root cause finding: the AI connected both issues
-  to a single plausible shared cause (incomplete upstream validation
-  during ETL), a correlation the rule engine has no mechanism to make,
-  since `quality_checks.sql` evaluates every rule independently.
-- Both real assessments (`warn`, `block`) correctly triggered automatic
-  alert creation in `data_quality_alerts`, each including the specific
-  downstream reports and metrics put at risk (e.g. borough-level SLA
-  compliance, response-time percentiles) rather than a generic "data
-  quality issue" message.
-- With only 2 assessments logged so far, the agreement rate is 100%,
-  which is not yet a meaningful sample. The agreement-rate query is
-  built and verified; a statistically meaningful rate will emerge as
-  more varied runs accumulate over time.
-
-New files:
-
-- `sql/ai_tables.sql`
-- `sql/verify_ai_layer.sql`
-- `sql/proposed_fixes_table.sql`
-- `scripts/build_context.py`
-- `scripts/ai_reviewer.py`
-- `scripts/apply_remediation.py`
-
-### Day 14: AI Reliability Agent Stress-Test with Synthetic Scenarios
-
-**Important disclosure:** this entry uses synthetic, hand-crafted
-quality_log data (table_name = 'synthetic_test_data'), not real pipeline
-output. It exists to test the AI review mechanism against a wider range
-of situations than DataGuard's single real pipeline run could provide,
-and to produce a less trivial agreement-rate sample. It does **not**
-demonstrate genuine calibration or learning over time -- a real version
-of that would require many real runs accumulated across real days or
-weeks, which this project has not yet had the chance to produce. The
-mechanism (comparing AI judgment against the rule engine across multiple
-runs) is real and verified; the volume and realism of the data behind
-it is not.
-
-Completed:
-
-- Created `scripts/generate_synthetic_runs.py`, defining 4 scenarios
-  deliberately designed to test different kinds of judgment:
-  a widespread, high-volume failure across two related rules; an
-  isolated single-record anomaly; two genuinely unrelated issues
-  occurring together; and a known issue type (from the one real run)
-  recurring at a different scale
-- Severity for each synthetic issue is computed using the exact same
-  threshold logic as `quality_checks.sql`, reading live from
-  `quality_rules`, so synthetic data is classified identically to how
-  real data would be
-- Found that `build_context.py` and `apply_remediation.py` would crash
-  when asked to sample affected records from `synthetic_test_data`,
-  since it isn't a real table. Fixed by adding a `table_exists` check,
-  run once per call rather than discovered mid-loop, so a
-  non-existent table results in an empty record list instead of an
-  aborted database transaction
-- Ran `ai_reviewer.py` and `apply_remediation.py` against all 4
-  synthetic scenarios
-
-Key findings:
-
-- Across 5 total runs (1 real, 4 synthetic) and 9 total issue
-  assessments, the AI agreed with the rule engine's severity 6 times
-  and disagreed 3 times -- a 66.7% agreement rate (see
-  `sql/verify_ai_layer.sql`).
-- Every disagreement pushed severity **up** relative to the rule
-  engine, and in every case involved a completeness-style issue
-  (missing city, missing borough, unspecified borough) at high volume
-  -- the AI appears to weigh "a large share of records affected" more
-  heavily than the rule engine's fixed numeric thresholds do.
-- For issues the rule engine already treats as High regardless of
-  count (`invalid_coordinates`, `negative_resolution_time`), the AI
-  agreed even at a trivial scale (2-3 records), reasoning that these
-  are correctness problems rather than volume problems -- its
-  explanation focused on what the corrupted data would break
-  downstream, not how many records were affected.
-- In the deliberately unrelated-issues scenario (duplicate keys and
-  missing created_date, with no real shared cause), the AI still
-  populated a root cause finding as the schema requires, but with
-  notably weaker, more hedged language than its other findings,
-  including an explicit note that this might just be synthetic test
-  data rather than a real upstream problem. It did not fabricate a
-  confident false narrative, which was the specific behavior this
-  scenario was designed to check for.
-
-New files:
-
-- `scripts/generate_synthetic_runs.py`
+See [docs/BUILD_LOG.md](docs/BUILD_LOG.md) for the complete day-by-day build history, including every bug found and how it was diagnosed and fixed.
